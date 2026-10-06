@@ -10,6 +10,7 @@ Antes de realizar tareas, modificaciones en escenas, scripts o selección de ass
 
 - [**Asset Guidelines**](/docs/asset_guidelines.md): Reglas estrictas sobre qué carpetas de assets usar y cuáles ignorar.
 - [**Plane Controller**](/docs/plane_controller.md): Arquitectura, controles y parámetros del avión y su cámara.
+- [**Procedural Terrain**](/docs/procedural_terrain.md): Generador procedural de montañas con ruido y colisión física.
 
 ---
 

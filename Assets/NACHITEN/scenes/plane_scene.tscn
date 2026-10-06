@@ -6,6 +6,7 @@
 [ext_resource type="Script" uid="uid://d1fximh51dxfx" path="res://Assets/NACHITEN/scripts/plane_controller.gd" id="4_plane_ctrl"]
 [ext_resource type="Material" uid="uid://dqwtfm7qx5lt1" path="res://Assets/NACHITEN/shaders/checkerboard_floor_material.tres" id="5_floor_mat"]
 [ext_resource type="Script" uid="uid://cw87ucib8v5j7" path="res://Assets/NACHITEN/scripts/smooth_camera.gd" id="6_smooth_cam"]
+[ext_resource type="Script" path="res://Assets/NACHITEN/scripts/procedural_terrain.gd" id="7_terrain"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_sky01"]
 sky_horizon_color = Color(0.646, 0.654, 0.67, 1)
@@ -49,6 +50,9 @@ surface_material_override/0 = ExtResource("5_floor_mat")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Floor/StaticBody3D" unique_id=1373883054]
 shape = SubResource("WorldBoundaryShape3D_floor")
+
+[node name="ProceduralTerrain" type="Node3D" parent="."]
+script = ExtResource("7_terrain")
 
 [node name="SM_Prop_Plane_Ring_01" parent="." unique_id=270654151 instance=ExtResource("1_lmd21")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 30, 35.326992)
