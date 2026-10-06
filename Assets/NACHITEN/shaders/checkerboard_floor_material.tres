@@ -1,0 +1,17 @@
+[gd_resource type="ShaderMaterial" format=3 uid="uid://dqwtfm7qx5lt1"]
+
+[ext_resource type="Shader" uid="uid://bicgtnr1iyit4" path="res://Assets/NACHITEN/shaders/checkerboard_floor.gdshader" id="1_shader"]
+
+[resource]
+render_priority = 0
+shader = ExtResource("1_shader")
+shader_parameter/color_a = Color(0.24, 0.32, 0.24, 1)
+shader_parameter/color_b = Color(0.34, 0.44, 0.34, 1)
+shader_parameter/minor_line_color = Color(0.16, 0.22, 0.16, 1)
+shader_parameter/major_line_color = Color(1, 0.45, 0.05, 1)
+shader_parameter/cell_size = 100.0
+shader_parameter/minor_line_width = 0.015
+shader_parameter/major_step = 10.0
+shader_parameter/major_line_width = 0.008
+shader_parameter/roughness = 0.85
+shader_parameter/fade_distance = 10000.0
