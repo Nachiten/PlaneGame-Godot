@@ -97,6 +97,22 @@ func explode(plane_body: CharacterBody3D, impact_velocity: Vector3, contact_poin
 	if contact_point == Vector3.ZERO:
 		contact_point = plane_body.global_position
 
+	# ── FIX: Desactivar la física del CharacterBody3D PRIMERO, antes de spawnear los escombros.
+	# Si esperamos al paso 5, el avión sigue colisionando con el terreno mientras los RigidBody3D
+	# se instancian encima, causando impulsos de despenetración violentos que empujan los escombros
+	# hacia abajo y atraviesan el HeightMapShape3D.
+	plane_body.collision_layer = 0
+	plane_body.collision_mask = 0
+	plane_body.velocity = Vector3.ZERO
+	var main_col := plane_body.find_child("CollisionShape3D", false, false) as CollisionShape3D
+	if main_col:
+		main_col.set_deferred("disabled", true)
+
+	# ── FIX: Elevar el origen de spawn de escombros ligeramente sobre el punto de contacto.
+	# Si el avión impacta en picado, contact_point puede estar dentro o debajo de la superficie
+	# del HeightMapShape3D. Los escombros que nazcan enterrados recibirán depenetración hacia abajo.
+	var safe_spawn_origin: Vector3 = contact_point + Vector3.UP * 1.5
+
 	# 1. Instanciar el efecto de explosión aplicando la velocidad configurada
 	if _explosion_vfx_scene:
 		var vfx: Node3D = _explosion_vfx_scene.instantiate() as Node3D
@@ -125,7 +141,7 @@ func explode(plane_body: CharacterBody3D, impact_velocity: Vector3, contact_poin
 
 	# 4. Convertir cada pieza en un RigidBody3D independiente
 	for mesh_node in mesh_nodes:
-		var rb := _create_debris_part(mesh_node, contact_point, impact_velocity)
+		var rb := _create_debris_part(mesh_node, safe_spawn_origin, impact_velocity)
 		if rb:
 			debris_container.add_child(rb)
 			spawned_rbs.append(rb)
@@ -137,15 +153,8 @@ func explode(plane_body: CharacterBody3D, impact_velocity: Vector3, contact_poin
 	# cuando están todos apilados en el suelo, el motor de físicas colapsa intentando separar
 	# 50 cascos convexos superpuestos, lo que traba el juego y catapulta las piezas.
 
-	# 5. Ocultar el modelo original y desactivar la física del avión padre
+	# 5. Ocultar el modelo original
 	model_root.visible = false
-	plane_body.collision_layer = 0
-	plane_body.collision_mask = 0
-	plane_body.velocity = Vector3.ZERO
-
-	var main_col := plane_body.find_child("CollisionShape3D", false, false) as CollisionShape3D
-	if main_col:
-		main_col.set_deferred("disabled", true)
 
 	# 6. Limpieza diferida de los escombros tras unos segundos
 	if debris_lifetime > 0.0:
@@ -190,9 +199,10 @@ func _create_debris_part(mesh_node: MeshInstance3D, explosion_origin: Vector3, i
 	rb.physics_material_override = pmat
 	rb.linear_damp = 2.5
 	rb.angular_damp = 2.5
-	# CCD desactivado: al usar HeightMapShape3D en el terreno (que tiene volumen sólido),
-	# el tunneling se mitiga naturalmente. Activar CCD en decenas de piezas causaba un lagazo masivo.
-	rb.continuous_cd = false
+	# CCD activado solo si la velocidad de impacto es alta (>25 m/s).
+	# A baja velocidad se desactiva para no penalizar el rendimiento.
+	# HeightMapShape3D tiene volumen sólido, por lo que CCD es suficiente para evitar tunneling.
+	rb.continuous_cd = impact_velocity.length() > 25.0
 
 	# Asignar masa según el tipo de componente (más balanceado para piezas cortadas)
 	var part_name := mesh_node.name.to_lower()
@@ -254,8 +264,17 @@ func _create_debris_part(mesh_node: MeshInstance3D, explosion_origin: Vector3, i
 	var force_mag: float = randf_range(explosion_force_min, explosion_force_max)
 
 	# Inercia hacia adelante proporcional a la velocidad del choque (reducida al 15%)
-	var forward_momentum: Vector3 = impact_velocity * randf_range(0.05, 0.15)
+	# ── FIX: Eliminar la componente Y negativa de impact_velocity antes de aplicarla.
+	# Si el avión impactó en picado (impact_velocity.y muy negativo), transmitir esa
+	# inercia hacia abajo a los escombros los empuja directamente contra el terreno,
+	# causando tunneling incluso con el spawn_origin elevado.
+	var safe_impact := impact_velocity
+	safe_impact.y = maxf(safe_impact.y, 0.0)
+	var forward_momentum: Vector3 = safe_impact * randf_range(0.05, 0.15)
 	var raw_velocity: Vector3 = forward_momentum + outward_dir * force_mag
+	# ── FIX: Garantizar que la velocidad Y resultante nunca sea negativa (nunca hacia el suelo).
+	# Esto impide que la suma forward_momentum + impulso explosivo termine empujando hacia abajo.
+	raw_velocity.y = maxf(raw_velocity.y, 0.5)
 	# Clampear la velocidad máxima para evitar catapultado violento por depenetración
 	if raw_velocity.length() > debris_max_linear_speed:
 		raw_velocity = raw_velocity.normalized() * debris_max_linear_speed
