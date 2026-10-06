@@ -28,6 +28,8 @@ extends CharacterBody3D
 @export var rotation_lerp: float = 4.0
 ## Invertir controles verticales (Pitch)
 @export var invert_pitch: bool = false
+## Ángulo máximo de cabeceo (grados arriba/abajo) para evitar volteretas
+@export var max_pitch_angle: float = 80.0
 
 # -- Visuales --
 ## Ángulo máximo de inclinación al girar (Roll / Banking en grados)
@@ -62,6 +64,12 @@ func _ready() -> void:
 	# Buscar nodo visual y hélice
 	_visual_mesh = find_child("SM_Veh_Plane_Stunt_01", true, false) as Node3D
 	_propeller = find_child("SM_Veh_Plane_Stunt_01_Prop", true, false) as Node3D
+
+	# Desactivar colisión interna del modelo para evitar que el avión choque contra sí mismo
+	var internal_collider := find_child("MeshCollider", true, false) as CollisionObject3D
+	if internal_collider:
+		internal_collider.collision_layer = 0
+		internal_collider.collision_mask = 0
 
 
 func _physics_process(delta: float) -> void:
@@ -129,16 +137,32 @@ func _process_steering(delta: float) -> void:
 	_smooth_pitch = lerp(_smooth_pitch, target_pitch, rotation_lerp * delta)
 	_smooth_yaw = lerp(_smooth_yaw, target_yaw, rotation_lerp * delta)
 
-	# Aplicar rotación local
-	# El avión mira hacia +Z local, el ala izquierda está en +X
-	# Rotación en X local (+X): ángulo positivo inclina nariz hacia abajo
+	# 1. Cabeceo local (Pitch)
 	var pitch_amount: float = _smooth_pitch * deg_to_rad(pitch_speed) * delta
 	rotate_object_local(Vector3.RIGHT, pitch_amount)
 
-	# Rotación en Y local (+Y): ángulo positivo gira hacia la izquierda (+X)
-	# Por tanto: ángulo negativo gira a la derecha
+	# Limitar cabeceo máximo para evitar que el avión se invierta verticalmente
+	if max_pitch_angle > 0.0 and max_pitch_angle < 90.0:
+		var max_y: float = sin(deg_to_rad(max_pitch_angle))
+		var fwd: Vector3 = global_transform.basis.z
+		if absf(fwd.y) > max_y:
+			fwd.y = clampf(fwd.y, -max_y, max_y)
+			var horiz_len: float = sqrt(maxf(0.0, 1.0 - fwd.y * fwd.y))
+			var horiz_dir: Vector2 = Vector2(fwd.x, fwd.z).normalized() * horiz_len
+			fwd.x = horiz_dir.x
+			fwd.z = horiz_dir.y
+			global_transform.basis.z = fwd.normalized()
+
+	# 2. Viraje sobre el eje vertical del mundo (evita inducir roll por inclinación de cabeceo)
 	var yaw_amount: float = -_smooth_yaw * deg_to_rad(yaw_speed) * delta
-	rotate_object_local(Vector3.UP, yaw_amount)
+	rotate_y(yaw_amount)
+
+	# 3. Auto-leveling de horizonte: mantiene las alas del fuselaje perfectamente horizontales con el mundo (Roll = 0°)
+	var forward: Vector3 = global_transform.basis.z.normalized()
+	if absf(forward.y) < 0.999:
+		var left: Vector3 = Vector3.UP.cross(forward).normalized()
+		var up: Vector3 = forward.cross(left).normalized()
+		global_transform.basis = Basis(left, up, forward)
 
 
 func _process_movement(_delta: float) -> void:

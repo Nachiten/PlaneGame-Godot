@@ -12,18 +12,22 @@ Para respetar las mejores prácticas de Godot 4 y permitir detección de colisio
 Testing Scene (Node3D)
 ├── WorldEnvironment (Cielo procedural y entorno)
 ├── DirectionalLight3D
-├── SM_Prop_Plane_Ring_01 .. 04 (Aros de objetivo)
-└── PlayerPlane (CharacterBody3D) [plane_controller.gd]
-    ├── CollisionShape3D (SphereShape3D r=2.5)
-    ├── SM_Veh_Plane_Stunt_01 (Malla visual 3D del avión y sus partes)
-    │   └── SM_Veh_Plane_Stunt_01_Prop (Hélice)
-    └── Camera3D (Cámara en tercera persona)
+├── Floor (Piso procedural con shader de ajedrez)
+├── SM_Prop_Plane_Ring_01 .. 06 (Aros de objetivo)
+├── PlayerPlane (CharacterBody3D) [plane_controller.gd]
+│   ├── CollisionShape3D (SphereShape3D r=2.5)
+│   └── SM_Veh_Plane_Stunt_01 (Malla visual 3D del avión y sus partes)
+│       └── SM_Veh_Plane_Stunt_01_Prop (Hélice)
+└── Camera3D (Camera3D) [smooth_camera.gd]
 ```
 
-### Cámara del Jugador
-- **Posición relativa**: `(0, 8.201576, -12.943382)`
-- **Rotación relativa**: Calibrada por el usuario (apuntando hacia adelante sobre la cola del avión).
-- **Padre**: Hija directa de `PlayerPlane`. Al rotar o desplazarse el cuerpo del avión, la cámara lo sigue con 100% de consistencia.
+### Cámara Suave del Jugador (`smooth_camera.gd`)
+- **Independiente de la jerarquía**: La cámara es un nodo hermano de `PlayerPlane` (hija directa de `Testing Scene`). Esto desacopla el giro instantáneo del avión del punto de vista del jugador, eliminando por completo el mareo por movimiento.
+- **Posición y Rotación de referencia sagrada**: Mantiene exactamente la posición `(0, 8.201576, -12.943382)` y orientación configurada por el usuario como punto de equilibrio relativo al avión.
+- **Amortiguación suave**:
+  - Posición: Damping exponencial con `follow_speed` (`6.0`).
+  - Rotación: `Quaternion.slerp` amortiguado con `rotation_speed` (`4.5`).
+  - Inicio sin saltos: En `_ready()` se alinea instantáneamente al avión para evitar tirones en el primer frame.
 
 ---
 
@@ -60,9 +64,11 @@ El juego cuenta con un modelo de vuelo arcade/casual: el avión avanza constante
 
 1. **Banking Visual (Inclinación de alas)**:
    - Al virar con `A` o `D`, la malla visual (`SM_Veh_Plane_Stunt_01`) se inclina en su eje local hasta `28°`.
-   - Como la inclinación se aplica a la malla hija y no al nodo raíz, la **cámara no rota bruscamente**, evitando sensación de mareo y ofreciendo un estilo visual dinámico similar a juegos como *Star Fox*.
 2. **Animación de la Hélice**:
    - Detecta automáticamente el nodo `SM_Veh_Plane_Stunt_01_Prop` y lo hace rotar continuamente a alta velocidad (`1800°/s`).
+3. **Horizon Auto-Leveling (Estabilización de Horizonte)**:
+   - Aplica el viraje (Yaw) sobre el eje vertical del mundo (`Vector3.UP` global) y reconstruye la matriz `Basis` ortonormal alineada al horizonte en cada frame.
+   - Elimina por completo el "roll drift" (torsión parásita por holonomía de rotación), garantizando que el fuselaje físico mantenga $0.0^\circ$ de roll independientemente de cuánto se gire o cabecee.
 
 ---
 
@@ -80,6 +86,7 @@ En el inspector de Godot se pueden calibrar los siguientes valores:
 | `yaw_speed` | `float` | `50.0` | Sensibilidad de viraje (grados/s). |
 | `rotation_lerp` | `float` | `4.0` | Suavizado de la entrada de dirección. |
 | `invert_pitch` | `bool` | `false` | Invertir cabeceo vertical (estilo simulador de vuelo). |
+| `max_pitch_angle` | `float` | `80.0` | Límite máximo de cabeceo (grados arriba/abajo) para evitar volteretas verticales. |
 | `max_bank_angle`| `float` | `28.0` | Ángulo máximo de inclinación visual de alas al girar. |
 | `bank_lerp` | `float` | `5.0` | Velocidad con la que las alas vuelven a posición horizontal. |
 | `propeller_spin_speed` | `float` | `1800.0` | Velocidad de rotación de la hélice (grados/s). |
