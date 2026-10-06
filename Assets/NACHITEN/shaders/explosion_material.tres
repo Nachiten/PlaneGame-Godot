@@ -1,0 +1,14 @@
+[gd_resource type="ShaderMaterial" load_steps=2 format=3]
+
+[ext_resource type="Shader" path="res://Assets/NACHITEN/shaders/explosion.gdshader" id="1_exp_shader"]
+
+[resource]
+render_priority = 0
+shader = ExtResource("1_exp_shader")
+shader_parameter/progress = 0.0
+shader_parameter/color_core = Color(1, 0.96, 0.65, 1)
+shader_parameter/color_fire = Color(1, 0.38, 0.03, 1)
+shader_parameter/color_smoke = Color(0.12, 0.1, 0.11, 1)
+shader_parameter/displacement_strength = 1.5
+shader_parameter/noise_scale = 2.4
+shader_parameter/emission_energy = 9.0

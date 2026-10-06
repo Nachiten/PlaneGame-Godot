@@ -90,3 +90,31 @@ En el inspector de Godot se pueden calibrar los siguientes valores:
 | `max_bank_angle`| `float` | `28.0` | Ángulo máximo de inclinación visual de alas al girar. |
 | `bank_lerp` | `float` | `5.0` | Velocidad con la que las alas vuelven a posición horizontal. |
 | `propeller_spin_speed` | `float` | `1800.0` | Velocidad de rotación de la hélice (grados/s). |
+| `explosion_speed` | `float` | `1.0` | Multiplicador de velocidad de la explosión (1.0 = normal, 0.2 = cámara lenta épica). |
+
+---
+
+## 6. Sistema de Impacto, Explosión y Desmembramiento Físico
+
+Al colisionar contra el terreno montañoso o el suelo (`move_and_slide()` con colisiones activas), el avión ejecuta una secuencia arcade de destrucción modular:
+
+1. **Pre-calentamiento de Shader y Formas de Colisión (Anti-Lag)**:
+   - Para evitar el tirón/lagazo de compilación de shader la primera vez que choca, [`plane_destruction.gd`](file:///c:/Repos%20Godot/PlaneGame/Assets/NACHITEN/scripts/plane_destruction.gd) instancia un dummy microscópico en `_ready()` que obliga a la GPU a compilar el pipeline del shader durante la carga inicial.
+   - Además, pre-calcula los convex hulls físicos de las 12 piezas en memoria al inicio, logrando un impacto fluido a 60+ FPS sin pausas.
+
+2. **Shader de Explosión (`explosion.gdshader` / `explosion_vfx.tscn`)**:
+   - Dispara una bola de fuego procedural mediante ruido 3D Simplex/FBM que deforma los vértices de una esfera hacia afuera en tiempo real.
+   - Cuenta con transición térmica: núcleo incandescente amarillo/blanco $\to$ fuego naranja $\to$ humo oscuro disipándose con clumping/erosión de ruido.
+   - Genera un destello de luz omnidireccional cálido (`OmniLight3D`), una onda de choque expansiva en el suelo y una ráfaga de chispas y partículas de humo.
+   - El efecto se auto-libera (`queue_free()`) al terminar su ciclo animado vía Tween.
+
+3. **Desmembramiento Físico (`plane_destruction.gd`)**:
+   - Cada submalla del modelo (`SM_Veh_Plane_Stunt_01`: fuselaje, hélice, ruedas, alerones individuales, timón de cola, cúpula de cristal, palanca de cabina) se extrae y se convierte en un `RigidBody3D` independiente.
+   - A cada parte se le asigna su colisión simplificada (`create_convex_shape()`), masa proporcional a su tamaño y material físico con fricción y rebote.
+   - Se aplica un impulso explosivo radial hacia afuera con sesgo ascendente, sumado a la inercia del avance del avión y velocidades angulares aleatorias para que giren y reboten por las pendientes.
+   - El avión original desactiva sus controles y colisiones para evitar interferencias.
+
+4. **Cámara Cinemática de Choque & Reinicio**:
+   - `smooth_camera.gd` detecta el impacto y enfoca de forma cinematográfica los restos del fuselaje sin rotaciones bruscas que mareen al jugador.
+   - El HUD despliega el cartel de impacto permitiendo reiniciar el vuelo instantáneamente con la tecla `[ R ]`.
+

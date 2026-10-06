@@ -1,0 +1,93 @@
+[gd_scene format=3 uid="uid://bvyg7k4g3r3ox"]
+
+[ext_resource type="Script" uid="uid://dyvusqkh0tjw0" path="res://Assets/NACHITEN/scripts/explosion_vfx.gd" id="1_vfx_script"]
+[ext_resource type="Material" path="res://Assets/NACHITEN/shaders/explosion_material.tres" id="2_exp_mat"]
+
+[sub_resource type="SphereMesh" id="SphereMesh_fireball"]
+radius = 1.6
+height = 3.2
+radial_segments = 32
+rings = 16
+
+[sub_resource type="TorusMesh" id="TorusMesh_shockwave"]
+inner_radius = 0.8
+rings = 24
+ring_segments = 8
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_shockwave"]
+transparency = 1
+blend_mode = 1
+cull_mode = 2
+shading_mode = 0
+albedo_color = Color(1, 0.75, 0.35, 0.85)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_sparks"]
+shading_mode = 0
+albedo_color = Color(1, 0.85, 0.2, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_spark"]
+material = SubResource("StandardMaterial3D_sparks")
+size = Vector3(0.2, 0.2, 0.2)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_smoke"]
+transparency = 1
+albedo_color = Color(0.15, 0.13, 0.14, 0.8)
+roughness = 0.9
+
+[sub_resource type="SphereMesh" id="SphereMesh_smoke"]
+material = SubResource("StandardMaterial3D_smoke")
+radius = 0.7
+height = 1.4
+radial_segments = 8
+rings = 6
+
+[node name="ExplosionVFX" type="Node3D" unique_id=238105258]
+script = ExtResource("1_vfx_script")
+
+[node name="Fireball" type="MeshInstance3D" parent="." unique_id=1155971315]
+mesh = SubResource("SphereMesh_fireball")
+surface_material_override/0 = ExtResource("2_exp_mat")
+
+[node name="FlashLight" type="OmniLight3D" parent="." unique_id=350322961]
+light_color = Color(1, 0.65, 0.25, 1)
+light_energy = 14.0
+omni_range = 45.0
+omni_attenuation = 1.5
+
+[node name="Shockwave" type="MeshInstance3D" parent="." unique_id=1207750823]
+mesh = SubResource("TorusMesh_shockwave")
+surface_material_override/0 = SubResource("StandardMaterial3D_shockwave")
+
+[node name="Sparks" type="CPUParticles3D" parent="." unique_id=612190918]
+emitting = false
+amount = 32
+lifetime = 1.1
+one_shot = true
+explosiveness = 0.95
+mesh = SubResource("BoxMesh_spark")
+emission_shape = 1
+emission_sphere_radius = 0.5
+direction = Vector3(0, 1, 0)
+spread = 180.0
+gravity = Vector3(0, -18, 0)
+initial_velocity_min = 14.0
+initial_velocity_max = 32.0
+angular_velocity_min = -180.0
+angular_velocity_max = 180.0
+
+[node name="SmokeDebris" type="CPUParticles3D" parent="." unique_id=1039630648]
+emitting = false
+amount = 22
+lifetime = 1.4
+one_shot = true
+explosiveness = 0.9
+mesh = SubResource("SphereMesh_smoke")
+emission_shape = 1
+emission_sphere_radius = 0.8
+direction = Vector3(0, 1, 0)
+spread = 90.0
+gravity = Vector3(0, 4, 0)
+initial_velocity_min = 6.0
+initial_velocity_max = 16.0
+scale_amount_min = 0.6
+scale_amount_max = 2.0

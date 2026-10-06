@@ -39,7 +39,13 @@ extends CharacterBody3D
 ## Velocidad de giro de la hélice (grados/seg)
 @export var propeller_spin_speed: float = 1800.0
 
+# -- Crash & Explosion --
+@export_group("Crash & Explosion")
+## Velocidad de la animación de explosión (1.0 = normal, 0.2 = cámara lenta épica, 2.0 = rápida)
+@export_range(0.05, 5.0, 0.05) var explosion_speed: float = 1.0
+
 # -- Debug --
+@export_group("Debug")
 ## Mostrar texto de telemetría / debug en pantalla
 @export var show_debug_hud: bool = true
 
@@ -48,18 +54,28 @@ var _visual_mesh: Node3D = null
 var _propeller: Node3D = null
 var _debug_label: Label = null
 var _debug_hud_layer: CanvasLayer = null
+var _destruction: PlaneDestruction = null
 
 # Estado interno
 var _current_speed: float = 0.0
 var _smooth_pitch: float = 0.0
 var _smooth_yaw: float = 0.0
 var _current_bank: float = 0.0
+var _is_destroyed: bool = false
 
 
 func _ready() -> void:
 	_current_speed = base_speed
 	_setup_input_actions()
 	_setup_debug_hud()
+
+	# Inicializar script de desmembramiento físico y explosión
+	_destruction = find_child("PlaneDestruction", false, false) as PlaneDestruction
+	if not _destruction:
+		_destruction = PlaneDestruction.new()
+		_destruction.name = "PlaneDestruction"
+		add_child(_destruction)
+	_destruction.explosion_speed = explosion_speed
 
 	# Buscar nodo visual y hélice
 	_visual_mesh = find_child("SM_Veh_Plane_Stunt_01", true, false) as Node3D
@@ -73,6 +89,11 @@ func _ready() -> void:
 
 
 func _physics_process(delta: float) -> void:
+	if _is_destroyed:
+		if Input.is_physical_key_pressed(KEY_R):
+			get_tree().reload_current_scene()
+		return
+
 	_process_speed(delta)
 	_process_steering(delta)
 	_process_movement(delta)
@@ -169,7 +190,92 @@ func _process_movement(_delta: float) -> void:
 	# El modelo del avión mira hacia +Z (hélice en +Z, cola en -Z)
 	var forward_direction: Vector3 = global_transform.basis.z.normalized()
 	velocity = forward_direction * _current_speed
+	var impact_vel: Vector3 = velocity
+
 	move_and_slide()
+
+	# Detección de colisiones contra el suelo o terreno
+	if not _is_destroyed:
+		if get_slide_collision_count() > 0:
+			var col := get_slide_collision(0)
+			_on_crash(col.get_position(), impact_vel)
+		elif global_position.y <= 0.4:
+			# Resguardo por si roza el piso infinito a nivel Y=0
+			_on_crash(Vector3(global_position.x, 0.0, global_position.z), impact_vel)
+
+
+## Disparado inmediatamente al detectar una colisión con el piso o terreno
+func _on_crash(contact_point: Vector3, impact_vel: Vector3) -> void:
+	if _is_destroyed:
+		return
+	_is_destroyed = true
+	_current_speed = 0.0
+	velocity = Vector3.ZERO
+
+	# Ejecutar desmembramiento físico y shader de explosión
+	var fuselage_debris: RigidBody3D = null
+	if _destruction:
+		_destruction.explosion_speed = explosion_speed
+		fuselage_debris = _destruction.explode(self, impact_vel, contact_point)
+
+	# Notificar a la cámara suave para que siga los restos en tercera persona
+	var cam := get_viewport().get_camera_3d()
+	if cam and cam.has_method("on_target_destroyed"):
+		cam.on_target_destroyed(fuselage_debris if fuselage_debris else self)
+
+	# Mostrar pantalla de impacto en el HUD
+	_show_crash_hud()
+
+
+func _show_crash_hud() -> void:
+	if not _debug_hud_layer:
+		return
+
+	# Panel central de Game Over
+	var panel := PanelContainer.new()
+	panel.name = "CrashBanner"
+	panel.set_anchors_preset(Control.PRESET_CENTER)
+	panel.position = Vector2(-180, -70)
+	panel.custom_minimum_size = Vector2(360, 140)
+
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.08, 0.02, 0.02, 0.88)
+	style.border_color = Color(1.0, 0.25, 0.1, 0.9)
+	style.set_border_width_all(2)
+	style.set_corner_radius_all(10)
+	style.content_margin_top = 16.0
+	style.content_margin_bottom = 16.0
+	style.content_margin_left = 20.0
+	style.content_margin_right = 20.0
+	panel.add_theme_stylebox_override("panel", style)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 8)
+
+	var title := Label.new()
+	title.text = "¡IMPACTO!"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 28)
+	title.add_theme_color_override("font_color", Color(1.0, 0.3, 0.15))
+	vbox.add_child(title)
+
+	var desc := Label.new()
+	desc.text = "El avión ha quedado completamente destruido."
+	desc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	desc.add_theme_font_size_override("font_size", 14)
+	desc.add_theme_color_override("font_color", Color(0.9, 0.9, 0.9))
+	vbox.add_child(desc)
+
+	var hint := Label.new()
+	hint.text = "Presiona [ R ] para reintentar el vuelo"
+	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	hint.add_theme_font_size_override("font_size", 16)
+	hint.add_theme_color_override("font_color", Color(1.0, 0.9, 0.4))
+	vbox.add_child(hint)
+
+	panel.add_child(vbox)
+	_debug_hud_layer.add_child(panel)
+
 
 
 func _process_visuals(delta: float) -> void:
