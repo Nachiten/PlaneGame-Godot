@@ -120,46 +120,46 @@ script = ExtResource("8_destruction")
 
 [node name="SM_Veh_Plane_Stunt_01" parent="PlayerPlane" unique_id=333953076 instance=ExtResource("8_b4lf6")]
 
-[node name="SM_Veh_Plane_Stunt_01" parent="PlayerPlane/SM_Veh_Plane_Stunt_01" index="0" unique_id=32953547]
+[node name="SM_Veh_Plane_Stunt_01" parent="PlayerPlane/SM_Veh_Plane_Stunt_01" index="0" unique_id=1212655848]
 surface_material_override/0 = ExtResource("9_0jx2i")
 
-[node name="SM_Veh_Plane_Stunt_01_Cockpit_Stick" parent="PlayerPlane/SM_Veh_Plane_Stunt_01/SM_Veh_Plane_Stunt_01" index="0" unique_id=1176742166]
+[node name="SM_Veh_Plane_Stunt_01_Cockpit_Stick" parent="PlayerPlane/SM_Veh_Plane_Stunt_01" index="1" unique_id=881476637]
 surface_material_override/0 = ExtResource("9_0jx2i")
 
-[node name="SM_Veh_Plane_Stunt_01_Crop_Duster" parent="PlayerPlane/SM_Veh_Plane_Stunt_01/SM_Veh_Plane_Stunt_01" index="1" unique_id=1367753981]
+[node name="SM_Veh_Plane_Stunt_01_Crop_Duster" parent="PlayerPlane/SM_Veh_Plane_Stunt_01" index="2" unique_id=1526354192]
 surface_material_override/0 = ExtResource("9_0jx2i")
 
-[node name="SM_Veh_Plane_Stunt_01_Flap_fl_01" parent="PlayerPlane/SM_Veh_Plane_Stunt_01/SM_Veh_Plane_Stunt_01" index="2" unique_id=1433391979]
+[node name="SM_Veh_Plane_Stunt_01_Flap_fl_01" parent="PlayerPlane/SM_Veh_Plane_Stunt_01" index="3" unique_id=772655362]
 surface_material_override/0 = ExtResource("9_0jx2i")
 
-[node name="SM_Veh_Plane_Stunt_01_Flap_fl_02" parent="PlayerPlane/SM_Veh_Plane_Stunt_01/SM_Veh_Plane_Stunt_01" index="3" unique_id=564422793]
+[node name="SM_Veh_Plane_Stunt_01_Flap_fl_02" parent="PlayerPlane/SM_Veh_Plane_Stunt_01" index="4" unique_id=1805934144]
 surface_material_override/0 = ExtResource("9_0jx2i")
 
-[node name="SM_Veh_Plane_Stunt_01_Flap_fr_01" parent="PlayerPlane/SM_Veh_Plane_Stunt_01/SM_Veh_Plane_Stunt_01" index="4" unique_id=183911643]
+[node name="SM_Veh_Plane_Stunt_01_Flap_fr_01" parent="PlayerPlane/SM_Veh_Plane_Stunt_01" index="5" unique_id=1800725575]
 surface_material_override/0 = ExtResource("9_0jx2i")
 
-[node name="SM_Veh_Plane_Stunt_01_Flap_fr_02" parent="PlayerPlane/SM_Veh_Plane_Stunt_01/SM_Veh_Plane_Stunt_01" index="5" unique_id=854547647]
+[node name="SM_Veh_Plane_Stunt_01_Flap_fr_02" parent="PlayerPlane/SM_Veh_Plane_Stunt_01" index="6" unique_id=855469863]
 surface_material_override/0 = ExtResource("9_0jx2i")
 
-[node name="SM_Veh_Plane_Stunt_01_Flap_rl_01" parent="PlayerPlane/SM_Veh_Plane_Stunt_01/SM_Veh_Plane_Stunt_01" index="6" unique_id=291725084]
+[node name="SM_Veh_Plane_Stunt_01_Flap_rl_01" parent="PlayerPlane/SM_Veh_Plane_Stunt_01" index="7" unique_id=931679503]
 surface_material_override/0 = ExtResource("9_0jx2i")
 
-[node name="SM_Veh_Plane_Stunt_01_Flap_rr_01" parent="PlayerPlane/SM_Veh_Plane_Stunt_01/SM_Veh_Plane_Stunt_01" index="7" unique_id=776393273]
+[node name="SM_Veh_Plane_Stunt_01_Flap_rr_01" parent="PlayerPlane/SM_Veh_Plane_Stunt_01" index="8" unique_id=2001780511]
 surface_material_override/0 = ExtResource("9_0jx2i")
 
-[node name="SM_Veh_Plane_Stunt_01_Flap_Tail" parent="PlayerPlane/SM_Veh_Plane_Stunt_01/SM_Veh_Plane_Stunt_01" index="8" unique_id=980684362]
+[node name="SM_Veh_Plane_Stunt_01_Flap_Tail" parent="PlayerPlane/SM_Veh_Plane_Stunt_01" index="9" unique_id=1722234989]
 surface_material_override/0 = ExtResource("9_0jx2i")
 
-[node name="SM_Veh_Plane_Stunt_01_Glass" parent="PlayerPlane/SM_Veh_Plane_Stunt_01/SM_Veh_Plane_Stunt_01" index="9" unique_id=727930939]
+[node name="SM_Veh_Plane_Stunt_01_Glass" parent="PlayerPlane/SM_Veh_Plane_Stunt_01" index="10" unique_id=876117947]
 surface_material_override/0 = ExtResource("10_ihswf")
 
-[node name="SM_Veh_Plane_Stunt_01_Prop" parent="PlayerPlane/SM_Veh_Plane_Stunt_01/SM_Veh_Plane_Stunt_01" index="10" unique_id=1462308138]
+[node name="SM_Veh_Plane_Stunt_01_Prop" parent="PlayerPlane/SM_Veh_Plane_Stunt_01" index="11" unique_id=913190081]
 surface_material_override/0 = ExtResource("9_0jx2i")
 
-[node name="SM_Veh_Plane_Stunt_01_Wheels" parent="PlayerPlane/SM_Veh_Plane_Stunt_01/SM_Veh_Plane_Stunt_01" index="11" unique_id=1120136034]
+[node name="SM_Veh_Plane_Stunt_01_Wheels" parent="PlayerPlane/SM_Veh_Plane_Stunt_01" index="12" unique_id=1442890533]
 surface_material_override/0 = ExtResource("9_0jx2i")
 
-[node name="SM_Veh_Plane_Stunt_01_Wing_L" parent="PlayerPlane/SM_Veh_Plane_Stunt_01" index="1" unique_id=2101738961]
+[node name="SM_Veh_Plane_Stunt_01_Wing_L" parent="PlayerPlane/SM_Veh_Plane_Stunt_01" index="13" unique_id=937035213]
 surface_material_override/0 = ExtResource("9_0jx2i")
 
 [node name="Camera3D" type="Camera3D" parent="." unique_id=2031219098]

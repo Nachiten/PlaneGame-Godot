@@ -76,13 +76,12 @@ func _precalculate_collision_shapes() -> void:
 
 	for mesh_node in all_meshes:
 		if mesh_node.mesh and not _cached_shapes.has(mesh_node.name):
-			var shape: Shape3D = mesh_node.mesh.create_convex_shape(true, true)
-			if not shape:
-				var box := BoxShape3D.new()
-				var aabb: AABB = mesh_node.mesh.get_aabb()
-				box.size = aabb.size.max(Vector3(0.25, 0.25, 0.25))
-				shape = box
-			_cached_shapes[mesh_node.name] = shape
+			# Usamos BoxShape3D. Los cascos convexos de mallas cortadas pueden ser "planos" (2D)
+			# o degenerados, lo cual congela el motor de físicas de Godot instantáneamente al chocar.
+			var box := BoxShape3D.new()
+			var aabb: AABB = mesh_node.mesh.get_aabb()
+			box.size = aabb.size.max(Vector3(0.2, 0.2, 0.2)) # Evitar que sea 0 en algún eje
+			_cached_shapes[mesh_node.name] = box
 
 
 ## Dispara el desmembramiento y la explosión
@@ -133,17 +132,10 @@ func explode(plane_body: CharacterBody3D, impact_velocity: Vector3, contact_poin
 			if "sm_veh_plane_stunt_01" in mesh_node.name.to_lower() or "fuselage" in mesh_node.name.to_lower() or main_fuselage_rb == null:
 				main_fuselage_rb = rb
 
-	# Activar colisión mutua entre escombros tras el retraso configurado
-	if debris_mutual_collision_delay > 0.0:
-		var tree := plane_body.get_tree()
-		if tree:
-			var mutual_timer := tree.create_timer(debris_mutual_collision_delay)
-			mutual_timer.timeout.connect(func():
-				for rb in spawned_rbs:
-					if is_instance_valid(rb):
-						# Activar escaneo de la Capa 2 (otros escombros)
-						rb.set_collision_mask_value(2, true)
-			)
+	# (Eliminado: Activación diferida de colisión mutua)
+	# Decidimos que los escombros nunca colisionarán entre sí. Si activamos la capa 2 (entre escombros) 
+	# cuando están todos apilados en el suelo, el motor de físicas colapsa intentando separar
+	# 50 cascos convexos superpuestos, lo que traba el juego y catapulta las piezas.
 
 	# 5. Ocultar el modelo original y desactivar la física del avión padre
 	model_root.visible = false
@@ -231,19 +223,19 @@ func _create_debris_part(mesh_node: MeshInstance3D, explosion_origin: Vector3, i
 			visual.set_surface_override_material(s, mat)
 	rb.add_child(visual)
 
-	# Crear CollisionShape3D utilizando la forma convexa pre-calculada en la carga
+	# Crear CollisionShape3D y ajustar su posición según la geometría
 	var col_shape := CollisionShape3D.new()
 	col_shape.name = "Collider"
 	var shape: Shape3D = _cached_shapes.get(mesh_node.name, null)
 
-	if not shape:
-		shape = mesh.create_convex_shape(true, true)
-		if not shape:
-			var box := BoxShape3D.new()
-			var aabb: AABB = mesh.get_aabb()
-			box.size = aabb.size.max(Vector3(0.25, 0.25, 0.25))
-			shape = box
-			col_shape.position = aabb.get_center()
+	if shape is BoxShape3D:
+		col_shape.position = mesh.get_aabb().get_center()
+		
+		# A prueba de balas: Sobrescribir el centro de masa de Godot
+		# Si en Blender el Origin estaba lejos de la geometría, esto obliga a Godot 
+		# a balancear el peso exactamente en el centro de la pieza visual.
+		rb.center_of_mass_mode = RigidBody3D.CENTER_OF_MASS_MODE_CUSTOM
+		rb.center_of_mass = col_shape.position
 
 	col_shape.shape = shape
 	rb.add_child(col_shape)
