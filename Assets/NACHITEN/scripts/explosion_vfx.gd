@@ -19,9 +19,10 @@ extends Node3D
 
 
 func _ready() -> void:
-	# Duplicar el material para que cada explosión tenga su propio progreso independiente
-	if fireball and fireball.get_surface_override_material(0):
-		fireball.set_surface_override_material(0, fireball.get_surface_override_material(0).duplicate())
+	# Ya no duplicamos el material. Al duplicar un material en tiempo de ejecución,
+	# Godot (Vulkan) a veces necesita re-validar el pipeline, lo que causa un lagazo
+	# y destruye el propósito del _prewarm_gpu_shader que hicimos al inicio.
+	# Como es un Game Over y solo hay una explosión a la vez, usamos el material compartido.
 
 	var effective_speed: float = maxf(speed_scale, 0.01)
 	var effective_duration: float = duration / effective_speed

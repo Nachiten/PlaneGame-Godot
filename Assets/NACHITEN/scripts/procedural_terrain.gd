@@ -166,47 +166,30 @@ func generate_terrain() -> void:
 	if terrain_material:
 		_mesh_instance.material_override = terrain_material
 
-	# 3. Colisión física (LOD optimizado a paso 2 para construcción instantánea del BVH)
+	# 3. Colisión física (Alto Rendimiento con HeightMapShape3D)
+	# HeightMapShape3D es extremadamente rápido de generar (evita lag de BVH)
+	# y previene tunneling al tener volumen sólido hacia abajo.
 	if generate_collision and _collision_shape:
-		var col_quads_x: int = int(ceil(float(quads_x) / 2.0))
-		var col_quads_z: int = int(ceil(float(quads_z) / 2.0))
-		var col_num_verts: int = col_quads_x * col_quads_z * 6
-		var col_verts := PackedVector3Array()
-		col_verts.resize(col_num_verts)
+		var shape := HeightMapShape3D.new()
+		shape.map_width = res_x
+		shape.map_depth = res_z
 
-		var c_idx: int = 0
-		var j: int = 0
-		while j < quads_z:
-			var next_j: int = min(j + 2, quads_z)
-			var z0: float = center_offset.z - half_z + float(j) * step_z
-			var z1: float = center_offset.z - half_z + float(next_j) * step_z
+		var map_data := PackedFloat32Array()
+		map_data.resize(res_x * res_z)
 
-			var i: int = 0
-			while i < quads_x:
-				var next_i: int = min(i + 2, quads_x)
-				var x0: float = center_offset.x - half_x + float(i) * step_x
-				var x1: float = center_offset.x - half_x + float(next_i) * step_x
+		var data_idx: int = 0
+		for j in range(res_z):
+			var row: PackedFloat32Array = heights[j]
+			for i in range(res_x):
+				map_data[data_idx] = row[i]
+				data_idx += 1
 
-				var p00 := Vector3(x0, heights[j][i], z0)
-				var p10 := Vector3(x1, heights[j][next_i], z0)
-				var p01 := Vector3(x0, heights[next_j][i], z1)
-				var p11 := Vector3(x1, heights[next_j][next_i], z1)
-
-				col_verts[c_idx] = p00; c_idx += 1
-				col_verts[c_idx] = p10; c_idx += 1
-				col_verts[c_idx] = p11; c_idx += 1
-
-				col_verts[c_idx] = p00; c_idx += 1
-				col_verts[c_idx] = p11; c_idx += 1
-				col_verts[c_idx] = p01; c_idx += 1
-
-				i += 2
-			j += 2
-
-		col_verts.resize(c_idx)
-		var shape := ConcavePolygonShape3D.new()
-		shape.set_faces(col_verts)
+		shape.map_data = map_data
 		_collision_shape.shape = shape
+		
+		# Alinear la escala y posición del collider con la cuadrícula procedural
+		_collision_shape.scale = Vector3(step_x, 1.0, step_z)
+		_collision_shape.position = Vector3(center_offset.x, 0.0, center_offset.z)
 
 
 ## Retorna la elevación Y en cualquier coordenada del mundo (x, z)

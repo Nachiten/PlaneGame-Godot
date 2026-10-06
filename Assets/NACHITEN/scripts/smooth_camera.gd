@@ -24,9 +24,22 @@ const SACRED_RELATIVE_TRANSFORM := Transform3D(
 	Vector3(0.0, 8.201576, -12.943382)
 )
 
+@export_group("Crash Camera Zoom")
+## Distancia horizontal de zoom-out hacia atrás tras el choque para tener visión panorámica
+@export var crash_zoom_distance: float = 24.0
+
+## Altura de la cámara por encima del punto de impacto durante el choque
+@export var crash_zoom_height: float = 9.0
+
+## Suavizado de transición de alejamiento (zoom-out) al chocar
+@export var crash_zoom_speed: float = 2.5
+
 
 var _is_crash_cam: bool = false
 var _last_focus_pos: Vector3 = Vector3.ZERO
+var _crash_away_dir: Vector3 = Vector3.BACK
+## Posición del impacto en el mundo, usada como ancla de cámara panoramica
+var _crash_impact_pos: Vector3 = Vector3.ZERO
 
 
 func _ready() -> void:
@@ -70,23 +83,46 @@ func on_target_destroyed(new_target: Node3D) -> void:
 		_last_focus_pos = new_target.global_position
 	elif is_instance_valid(target):
 		_last_focus_pos = target.global_position
+	# Guardar el punto exacto de impacto como ancla de la cámara panoramica
+	_crash_impact_pos = _last_focus_pos
+
+	# Calcular la dirección horizontal de alejamiento basada en la posición actual de la cámara
+	var away := (global_position - _last_focus_pos)
+	away.y = 0.0
+	if away.length_squared() < 0.1:
+		away = -global_transform.basis.z
+		away.y = 0.0
+	if away.length_squared() < 0.01:
+		away = Vector3(0.0, 0.0, -1.0)
+	_crash_away_dir = away.normalized()
 
 
 func _process_crash_camera(delta: float) -> void:
 	if is_instance_valid(target):
-		_last_focus_pos = target.global_position
+		# Seguimiento rápido del escombro para no quedarse atrás cuando sale disparado
+		var target_pos: Vector3 = target.global_position
+		_last_focus_pos = _last_focus_pos.lerp(target_pos, 1.0 - exp(-8.0 * delta))
+		# Actualizar dinámicamente la dirección de alejamiento basada en el movimiento real
+		var drift := target_pos - _crash_impact_pos
+		drift.y = 0.0
+		if drift.length_squared() > 1.0:
+			_crash_away_dir = drift.normalized()
 
-	# Posición orbital suave detrás y arriba del punto de impacto/escombro
-	var desired_cam_pos: Vector3 = _last_focus_pos + Vector3(0.0, 7.0, -11.0)
-	var pos_factor: float = 1.0 - exp(-3.0 * delta)
+	# La cámara se posiciona sobre el punto de impacto original para una vista panoramica estable
+	var cam_anchor: Vector3 = _crash_impact_pos
+	var desired_cam_pos: Vector3 = cam_anchor + (_crash_away_dir * crash_zoom_distance) + (Vector3.UP * crash_zoom_height)
+	var pos_factor: float = 1.0 - exp(-crash_zoom_speed * delta)
 	global_position = global_position.lerp(desired_cam_pos, pos_factor)
 
-	# Orientación cinemática mirando hacia los restos
-	var look_dir: Vector3 = (_last_focus_pos - global_position).normalized()
+	# Orientación cinemática mirando hacia el centro de los restos
+	var look_target: Vector3 = _last_focus_pos + Vector3.UP * 0.8
+	var look_dir: Vector3 = (look_target - global_position).normalized()
 	if look_dir.length_squared() > 0.01 and absf(look_dir.dot(Vector3.UP)) < 0.99:
 		var target_basis := Basis.looking_at(look_dir, Vector3.UP)
 		var cur_quat: Quaternion = global_transform.basis.get_rotation_quaternion()
 		var target_quat: Quaternion = target_basis.get_rotation_quaternion()
-		var rot_factor: float = 1.0 - exp(-4.0 * delta)
+		# Rotación rápida para mantenerse alineada con el objetivo en movimiento
+		var rot_factor: float = 1.0 - exp(-8.0 * delta)
 		global_transform.basis = Basis(cur_quat.slerp(target_quat, rot_factor))
+
 

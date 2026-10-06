@@ -10,11 +10,18 @@ signal plane_destroyed(debris_root: Node3D, fuselage_rb: RigidBody3D)
 ## Velocidad de reproducción de la explosión (1.0 = normal, 0.2 = cámara lenta épica, 3.0 = rápida)
 @export_range(0.05, 5.0, 0.05) var explosion_speed: float = 1.0
 
-@export var explosion_force_min: float = 14.0
-@export var explosion_force_max: float = 32.0
-@export var angular_speed_max: float = 22.0
-@export var upward_bias: float = 0.5
+@export var explosion_force_min: float = 3.0
+@export var explosion_force_max: float = 7.0
+## Velocidad lineal máxima permitida para los escombros (m/s) para evitar dispersión excesiva
+@export var debris_max_linear_speed: float = 20.0
+@export var angular_speed_max: float = 12.0
+@export var upward_bias: float = 0.3
 @export var debris_lifetime: float = 15.0
+
+## Tiempo (en segundos) durante el cual los escombros NO colisionan entre sí al explotar.
+## Esto evita el empuje violento por superposición de piezas contiguas recién cortadas.
+## Tras este tiempo, la colisión mutua se activa para que rueden y se apilen con normalidad.
+@export var debris_mutual_collision_delay: float = 1.0
 
 var _is_destroyed: bool = false
 var _cached_shapes: Dictionary = {}
@@ -47,6 +54,14 @@ func _prewarm_gpu_shader() -> void:
 	add_child(dummy)
 
 
+## Recorre recursivamente un árbol de nodos para extraer todos los MeshInstance3D
+func _collect_mesh_instances(node: Node, list: Array[MeshInstance3D]) -> void:
+	if node is MeshInstance3D and (node as MeshInstance3D).mesh != null:
+		list.append(node as MeshInstance3D)
+	for child in node.get_children():
+		_collect_mesh_instances(child, list)
+
+
 ## Pre-calcula los convex shapes de cada pieza del avión en memoria
 func _precalculate_collision_shapes() -> void:
 	var plane_body := get_parent() as Node3D
@@ -57,11 +72,7 @@ func _precalculate_collision_shapes() -> void:
 		return
 
 	var all_meshes: Array[MeshInstance3D] = []
-	if model_root is MeshInstance3D and (model_root as MeshInstance3D).mesh != null:
-		all_meshes.append(model_root as MeshInstance3D)
-	for child in model_root.get_children():
-		if child is MeshInstance3D and (child as MeshInstance3D).mesh != null:
-			all_meshes.append(child as MeshInstance3D)
+	_collect_mesh_instances(model_root, all_meshes)
 
 	for mesh_node in all_meshes:
 		if mesh_node.mesh and not _cached_shapes.has(mesh_node.name):
@@ -106,24 +117,33 @@ func explode(plane_body: CharacterBody3D, impact_velocity: Vector3, contact_poin
 		push_warning("PlaneDestruction: No se encontró SM_Veh_Plane_Stunt_01 en el avión")
 		return null
 
-	# Recopilar todos los MeshInstance3D (el nodo raíz y todos sus hijos)
+	# Recopilar todos los MeshInstance3D (recursivo para soportar jerarquías de Blender)
 	var mesh_nodes: Array[MeshInstance3D] = []
-	if model_root is MeshInstance3D and (model_root as MeshInstance3D).mesh != null:
-		mesh_nodes.append(model_root as MeshInstance3D)
-
-	for child in model_root.get_children():
-		if child is MeshInstance3D and (child as MeshInstance3D).mesh != null:
-			mesh_nodes.append(child as MeshInstance3D)
+	_collect_mesh_instances(model_root, mesh_nodes)
 
 	var main_fuselage_rb: RigidBody3D = null
+	var spawned_rbs: Array[RigidBody3D] = []
 
 	# 4. Convertir cada pieza en un RigidBody3D independiente
 	for mesh_node in mesh_nodes:
 		var rb := _create_debris_part(mesh_node, contact_point, impact_velocity)
 		if rb:
 			debris_container.add_child(rb)
-			if "SM_Veh_Plane_Stunt_01" == mesh_node.name:
+			spawned_rbs.append(rb)
+			if "sm_veh_plane_stunt_01" in mesh_node.name.to_lower() or "fuselage" in mesh_node.name.to_lower() or main_fuselage_rb == null:
 				main_fuselage_rb = rb
+
+	# Activar colisión mutua entre escombros tras el retraso configurado
+	if debris_mutual_collision_delay > 0.0:
+		var tree := plane_body.get_tree()
+		if tree:
+			var mutual_timer := tree.create_timer(debris_mutual_collision_delay)
+			mutual_timer.timeout.connect(func():
+				for rb in spawned_rbs:
+					if is_instance_valid(rb):
+						# Activar escaneo de la Capa 2 (otros escombros)
+						rb.set_collision_mask_value(2, true)
+			)
 
 	# 5. Ocultar el modelo original y desactivar la física del avión padre
 	model_root.visible = false
@@ -164,30 +184,40 @@ func _create_debris_part(mesh_node: MeshInstance3D, explosion_origin: Vector3, i
 	rb.name = "Debris_" + mesh_node.name
 	rb.global_transform = mesh_node.global_transform
 
-	# Capa de colisión estándar para interactuar con suelo y terreno
-	rb.collision_layer = 1
+	# Capa de colisión: el escombro reside en la Capa 2 (Escombros)
+	# Inicialmente solo detecta la Capa 1 (suelo y terreno) para no repelerse violentamente con piezas contiguas
+	rb.collision_layer = 2
 	rb.collision_mask = 1
+	if debris_mutual_collision_delay <= 0.0:
+		rb.set_collision_mask_value(2, true)
 
-	# Material físico con rebote y fricción elástica
+	# Material físico con rebote y fricción realista (metal contra tierra)
 	var pmat := PhysicsMaterial.new()
-	pmat.bounce = 0.35
-	pmat.friction = 0.65
+	pmat.bounce = 0.08
+	pmat.friction = 0.80
 	rb.physics_material_override = pmat
-	rb.linear_damp = 0.4
-	rb.angular_damp = 0.8
+	rb.linear_damp = 2.5
+	rb.angular_damp = 2.5
+	# CCD desactivado: al usar HeightMapShape3D en el terreno (que tiene volumen sólido),
+	# el tunneling se mitiga naturalmente. Activar CCD en decenas de piezas causaba un lagazo masivo.
+	rb.continuous_cd = false
 
-	# Asignar masa según el tipo de componente
+	# Asignar masa según el tipo de componente (más balanceado para piezas cortadas)
 	var part_name := mesh_node.name.to_lower()
-	if part_name == "sm_veh_plane_stunt_01":
-		rb.mass = 30.0 # Fuselaje principal
+	if "fuselage" in part_name or "body" in part_name or part_name == "sm_veh_plane_stunt_01":
+		rb.mass = 12.0 # Trozos de fuselaje
+	elif "wing" in part_name:
+		rb.mass = 7.0  # Alas
+	elif "tail" in part_name:
+		rb.mass = 5.0  # Cola
 	elif "wheel" in part_name or "prop" in part_name:
-		rb.mass = 6.0  # Hélice y tren de aterrizaje
+		rb.mass = 4.5  # Hélice y tren de aterrizaje
 	elif "flap" in part_name:
-		rb.mass = 3.5  # Alerones y timón
+		rb.mass = 3.0  # Alerones y timón
 	elif "glass" in part_name:
 		rb.mass = 2.0  # Cúpula de cristal
 	else:
-		rb.mass = 2.5  # Palanca, accesorios
+		rb.mass = 4.0  # Accesorios / piezas cortadas genéricas
 
 	# Crear MeshInstance3D visual clonado
 	var visual := MeshInstance3D.new()
@@ -201,7 +231,7 @@ func _create_debris_part(mesh_node: MeshInstance3D, explosion_origin: Vector3, i
 			visual.set_surface_override_material(s, mat)
 	rb.add_child(visual)
 
-	# Crear CollisionShape3D utilizando la forma pre-calculada en la carga
+	# Crear CollisionShape3D utilizando la forma convexa pre-calculada en la carga
 	var col_shape := CollisionShape3D.new()
 	col_shape.name = "Collider"
 	var shape: Shape3D = _cached_shapes.get(mesh_node.name, null)
@@ -225,17 +255,21 @@ func _create_debris_part(mesh_node: MeshInstance3D, explosion_origin: Vector3, i
 		outward_dir = Vector3(randf_range(-1.0, 1.0), randf_range(0.2, 1.0), randf_range(-1.0, 1.0))
 	outward_dir = outward_dir.normalized()
 
-	# Sesgo hacia arriba para que las piezas salgan volando por el aire
-	outward_dir.y = maxf(outward_dir.y, 0.2) + randf_range(0.3, upward_bias + 0.3)
-	outward_dir = (outward_dir + Vector3(randf_range(-0.35, 0.35), randf_range(0.0, 0.3), randf_range(-0.35, 0.35))).normalized()
+	# Sesgo hacia arriba controlado
+	outward_dir.y = maxf(outward_dir.y, 0.15) + randf_range(0.2, upward_bias + 0.2)
+	outward_dir = (outward_dir + Vector3(randf_range(-0.3, 0.3), randf_range(0.0, 0.25), randf_range(-0.3, 0.3))).normalized()
 
 	var force_mag: float = randf_range(explosion_force_min, explosion_force_max)
 
-	# Heredar parte de la inercia del avance del avión
-	var forward_momentum: Vector3 = impact_velocity * randf_range(0.3, 0.55)
-	rb.linear_velocity = forward_momentum + outward_dir * force_mag
+	# Inercia hacia adelante proporcional a la velocidad del choque (reducida al 15%)
+	var forward_momentum: Vector3 = impact_velocity * randf_range(0.05, 0.15)
+	var raw_velocity: Vector3 = forward_momentum + outward_dir * force_mag
+	# Clampear la velocidad máxima para evitar catapultado violento por depenetración
+	if raw_velocity.length() > debris_max_linear_speed:
+		raw_velocity = raw_velocity.normalized() * debris_max_linear_speed
+	rb.linear_velocity = raw_velocity
 
-	# Giro angular aleatorio (volteretas)
+	# Giro angular controlado
 	rb.angular_velocity = Vector3(
 		randf_range(-angular_speed_max, angular_speed_max),
 		randf_range(-angular_speed_max, angular_speed_max),
@@ -243,3 +277,4 @@ func _create_debris_part(mesh_node: MeshInstance3D, explosion_origin: Vector3, i
 	)
 
 	return rb
+

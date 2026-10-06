@@ -11,6 +11,8 @@ Antes de realizar tareas, modificaciones en escenas, scripts o selección de ass
 - [**Asset Guidelines**](/docs/asset_guidelines.md): Reglas estrictas sobre qué carpetas de assets usar y cuáles ignorar.
 - [**Plane Controller**](/docs/plane_controller.md): Arquitectura, controles y parámetros del avión y su cámara.
 - [**Procedural Terrain**](/docs/procedural_terrain.md): Generador procedural de montañas con ruido y colisión física.
+- [**Blender & Godot Workflow**](/docs/blender_godot_workflow.md): Flujo de trabajo 3D para corte de mallas, exportación e integración con el sistema de destrucción.
+- [**Terrain Collision Issues**](/docs/terrain_collision_issues.md): Diagnóstico de problemáticas de choque contra el terreno, cámara y traspaso de mallas.
 
 ---
 
